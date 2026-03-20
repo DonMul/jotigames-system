@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="/var/www/jotigames.nl"
+SYSTEM_REPO_URL="${SYSTEM_REPO_URL:-git@github.com:DonMul/jotigames-system.git}"
+SYSTEM_REPO_DIR="${ROOT_DIR}/system"
+SYSTEM_REPO_BRANCH="${SYSTEM_REPO_BRANCH:-}"
+
+log() {
+  echo "[bootstrap] $*"
+}
+
+run_as_root() {
+  if [[ "${EUID}" -eq 0 ]]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+require_apt_package() {
+  local package_name="$1"
+  if dpkg -s "${package_name}" >/dev/null 2>&1; then
+    return
+  fi
+  run_as_root apt-get install -y "${package_name}"
+}
+
+bootstrap_packages() {
+  if ! command -v apt-get >/dev/null 2>&1; then
+    log "This script currently supports Debian/Ubuntu servers (apt-get required)."
+    exit 1
+  fi
+
+  log "Installing required system packages"
+  run_as_root apt-get update -y
+
+  require_apt_package ca-certificates
+  require_apt_package curl
+  require_apt_package git
+  require_apt_package openssh-client
+  require_apt_package python3
+  require_apt_package python3-venv
+  require_apt_package python3-pip
+  require_apt_package nodejs
+  require_apt_package npm
+  require_apt_package nginx
+  require_apt_package certbot
+  require_apt_package python3-certbot-nginx
+  require_apt_package util-linux
+}
+
+resolve_default_branch() {
+  local repo_dir="$1"
+  local default_ref
+  default_ref="$(git -C "${repo_dir}" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true)"
+  default_ref="${default_ref#refs/remotes/origin/}"
+  if [[ -n "${default_ref}" ]]; then
+    echo "${default_ref}"
+  else
+    echo "main"
+  fi
+}
+
+checkout_or_update_system_repo() {
+  run_as_root mkdir -p "${ROOT_DIR}"
+
+  if [[ ! -d "${SYSTEM_REPO_DIR}/.git" ]]; then
+    log "Cloning system repo to ${SYSTEM_REPO_DIR}"
+    run_as_root git clone "${SYSTEM_REPO_URL}" "${SYSTEM_REPO_DIR}"
+  else
+    log "Updating system repo"
+    run_as_root git -C "${SYSTEM_REPO_DIR}" fetch --all --prune
+  fi
+
+  local branch
+  if [[ -n "${SYSTEM_REPO_BRANCH}" ]]; then
+    branch="${SYSTEM_REPO_BRANCH}"
+  else
+    branch="$(resolve_default_branch "${SYSTEM_REPO_DIR}")"
+  fi
+
+  run_as_root git -C "${SYSTEM_REPO_DIR}" checkout "${branch}"
+  run_as_root git -C "${SYSTEM_REPO_DIR}" pull --ff-only origin "${branch}"
+}
+
+run_deploy() {
+  local deploy_script="${SYSTEM_REPO_DIR}/deploy_update.sh"
+  if [[ ! -f "${deploy_script}" ]]; then
+    log "Missing deploy script: ${deploy_script}"
+    exit 1
+  fi
+
+  run_as_root chmod +x "${deploy_script}"
+  log "Running deployment script"
+  run_as_root bash "${deploy_script}"
+}
+
+main() {
+  bootstrap_packages
+  checkout_or_update_system_repo
+  run_deploy
+  log "Server bootstrap complete"
+}
+
+main "$@"

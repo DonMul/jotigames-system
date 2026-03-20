@@ -1,0 +1,14 @@
+[Unit]
+Description=JotiGames Frontend (Vite Preview)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/jotigames.nl/frontend
+ExecStart=/usr/bin/npm run preview -- --host 0.0.0.0 --port 4173
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
