@@ -3,6 +3,18 @@ set -euo pipefail
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
+if command -v locale >/dev/null 2>&1 && locale -a 2>/dev/null | grep -Eqi '^en_US\.utf8$|^en_US\.utf-8$'; then
+  export LANGUAGE="en_US:en"
+  export LANG="en_US.UTF-8"
+  export LC_ALL="en_US.UTF-8"
+  export LC_CTYPE="en_US.UTF-8"
+else
+  export LANGUAGE="en_US:en"
+  export LANG="C.UTF-8"
+  export LC_ALL="C.UTF-8"
+  export LC_CTYPE="C.UTF-8"
+fi
+
 ROOT_DIR="/var/www/jotigames.nl"
 BACKEND_PYTHON_BIN="${BACKEND_PYTHON_BIN:-python3.14}"
 NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-24}"
@@ -10,6 +22,7 @@ NODE_MIN_MINOR="${NODE_MIN_MINOR:-14}"
 SERVICES_DIR_SOURCE="${ROOT_DIR}/system/services"
 CRON_INSTALL_SCRIPT="${ROOT_DIR}/system/cron/install_crontab.sh"
 CRON_RESTART_SCRIPT="${ROOT_DIR}/system/cron/restart_workers.sh"
+BASHRC_TEMPLATE_SOURCE="${ROOT_DIR}/system/shell/bashrc.template"
 NGINX_CONFIG_SOURCE="${ROOT_DIR}/system/nginx/jotigames.conf"
 NGINX_HTTP_CONFIG_SOURCE="${ROOT_DIR}/system/nginx/jotigames.http.conf"
 NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/jotigames.conf"
@@ -255,6 +268,88 @@ restart_background_workers() {
   fi
 }
 
+resolve_deploy_shell_user() {
+  if [[ -n "${DEPLOY_SHELL_USER:-}" ]]; then
+    echo "${DEPLOY_SHELL_USER}"
+    return
+  fi
+
+  if [[ "${EUID}" -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+    echo "${SUDO_USER}"
+    return
+  fi
+
+  echo "${USER:-root}"
+}
+
+resolve_user_home_dir() {
+  local user_name="$1"
+  local home_dir=""
+
+  if command -v getent >/dev/null 2>&1; then
+    home_dir="$(getent passwd "${user_name}" | cut -d: -f6)"
+  fi
+
+  if [[ -z "${home_dir}" ]]; then
+    home_dir="$(eval echo "~${user_name}")"
+  fi
+
+  echo "${home_dir}"
+}
+
+install_bashrc_template() {
+  if [[ ! -f "${BASHRC_TEMPLATE_SOURCE}" ]]; then
+    log "Bashrc template missing: ${BASHRC_TEMPLATE_SOURCE}"
+    exit 1
+  fi
+
+  local target_user target_home target_bashrc
+  target_user="$(resolve_deploy_shell_user)"
+  target_home="$(resolve_user_home_dir "${target_user}")"
+
+  if [[ -z "${target_home}" || ! -d "${target_home}" ]]; then
+    log "Could not resolve home directory for user '${target_user}'"
+    exit 1
+  fi
+
+  target_bashrc="${target_home}/.bashrc"
+
+  local start_marker="# >>> jotigames managed aliases >>>"
+  local end_marker="# <<< jotigames managed aliases <<<"
+
+  local tmp_file output_file
+  tmp_file="$(mktemp)"
+  output_file="$(mktemp)"
+
+  if [[ -f "${target_bashrc}" ]]; then
+    awk -v start="${start_marker}" -v end="${end_marker}" '
+      $0 == start { in_block = 1; next }
+      $0 == end { in_block = 0; next }
+      !in_block { print }
+    ' "${target_bashrc}" > "${tmp_file}"
+  else
+    : > "${tmp_file}"
+  fi
+
+  {
+    cat "${tmp_file}"
+    echo
+    echo "${start_marker}"
+    cat "${BASHRC_TEMPLATE_SOURCE}"
+    echo "${end_marker}"
+  } > "${output_file}"
+
+  if [[ "${EUID}" -eq 0 ]]; then
+    cp "${output_file}" "${target_bashrc}"
+    chown "${target_user}:${target_user}" "${target_bashrc}" || true
+  else
+    cp "${output_file}" "${target_bashrc}"
+  fi
+
+  rm -f "${tmp_file}" "${output_file}"
+  log "Installed managed aliases into ${target_bashrc}"
+}
+
 install_and_restart_services() {
   log "Installing/updating systemd service units"
 
@@ -441,6 +536,7 @@ main() {
   setup_frontend_like "${ROOT_DIR}/admin"
   setup_ws
   install_cron
+  install_bashrc_template
   restart_background_workers
   install_and_restart_services
   verify_services_healthy

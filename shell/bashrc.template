@@ -1,0 +1,2 @@
+# JotiGames deploy shortcuts
+alias update-jotigames='bash /var/www/jotigames.nl/system/deploy_update.sh'

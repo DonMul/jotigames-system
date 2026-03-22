@@ -4,13 +4,19 @@
 # This entry runs the EK auto-resolver once at system boot.
 # `flock` prevents duplicate workers.
 
+###
+# GAME LOGIC
+###
+# Exploding Kittns
 @reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/auto_resolve_pending_actions.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/auto_resolve_pending_actions.py >> __WORKSPACE_ROOT__/system/logs/auto_resolve_pending_actions.log 2>&1
 
-# Birds of Prey auto-drop worker (continuous loop).
+# Birds of Prey
 @reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/birds_of_prey_auto_drop_eggs.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/birds_of_prey_auto_drop_eggs.py >> __WORKSPACE_ROOT__/system/logs/birds_of_prey_auto_drop_eggs.log 2>&1
 
-# Renew Let's Encrypt certs twice daily.
-# `flock` avoids overlapping renew runs if a previous run is still active.
+###
+# System Logic
+###
+# Renew Let's Encrypt certs
 15 3,15 * * * /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/certbot_renew.lock /usr/bin/certbot renew --quiet --deploy-hook "systemctl reload nginx" >> __WORKSPACE_ROOT__/system/logs/certbot_renew.log 2>&1
 
 # Daily SSH invalid-login autoblock task.
