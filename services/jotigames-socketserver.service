@@ -7,7 +7,9 @@ Type=simple
 User=root
 WorkingDirectory=/var/www/jotigames.nl/ws
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/npm start
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/bin/bash -lc 'node -e "const v=parseInt(process.versions.node.split(\".\")[0],10); if (!Number.isInteger(v) || v < 20) process.exit(1);"'
+ExecStart=/usr/bin/env node /var/www/jotigames.nl/ws/server.js
 Restart=on-failure
 RestartSec=3
 
