@@ -7,7 +7,7 @@ Type=simple
 User=root
 WorkingDirectory=/var/www/jotigames.nl/frontend
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStartPre=/bin/bash -lc 'node -e "const v=parseInt(process.versions.node.split(\".\")[0],10); if (!Number.isInteger(v) || v < 20) process.exit(1);"'
+ExecStartPre=/bin/bash -lc 'node -e "const v=Number((process.versions.node.match(/^[0-9]+/)||[0])[0]); if (!Number.isInteger(v) || v < 20) process.exit(1);"'
 ExecStartPre=/bin/bash -lc 'test -d /var/www/jotigames.nl/frontend/dist'
 ExecStart=/usr/bin/env node /var/www/jotigames.nl/frontend/node_modules/vite/bin/vite.js preview --host 0.0.0.0 --port 4173
 Restart=on-failure
