@@ -26,6 +26,43 @@ require_apt_package() {
   run_as_root apt-get install -y "${package_name}"
 }
 
+require_python_314() {
+  if command -v python3.14 >/dev/null 2>&1; then
+    return
+  fi
+
+  if run_as_root apt-get install -y python3.14 python3.14-venv; then
+    return
+  fi
+
+  log "python3.14 is required but could not be installed from apt repositories."
+  log "Install Python 3.14 manually (or add a repository that provides python3.14), then rerun bootstrap."
+  exit 1
+}
+
+ensure_nodejs_20() {
+  local current_major="0"
+  if command -v node >/dev/null 2>&1; then
+    current_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  fi
+
+  if [[ "${current_major}" =~ ^[0-9]+$ ]] && (( current_major >= 20 )); then
+    if ! command -v npm >/dev/null 2>&1; then
+      run_as_root apt-get install -y npm
+    fi
+    return
+  fi
+
+  log "Installing/upgrading Node.js 20 via NodeSource"
+  run_as_root bash -lc "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+  run_as_root apt-get install -y nodejs
+
+  if ! command -v node >/dev/null 2>&1; then
+    log "Node.js install failed."
+    exit 1
+  fi
+}
+
 bootstrap_packages() {
   if ! command -v apt-get >/dev/null 2>&1; then
     log "This script currently supports Debian/Ubuntu servers (apt-get required)."
@@ -39,11 +76,9 @@ bootstrap_packages() {
   require_apt_package curl
   require_apt_package git
   require_apt_package openssh-client
-  require_apt_package python3
-  require_apt_package python3-venv
+  require_python_314
   require_apt_package python3-pip
-  require_apt_package nodejs
-  require_apt_package npm
+  ensure_nodejs_20
   require_apt_package nginx
   require_apt_package certbot
   require_apt_package python3-certbot-nginx

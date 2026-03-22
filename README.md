@@ -21,7 +21,7 @@ This folder stores operational/system setup files for background jobs.
 - Script: `system/deploy_update.sh`
 - Purpose:
   - clone/update all production repos under `/var/www/jotigames.nl`
-  - install backend/python and frontend/admin/ws dependencies
+  - install backend/python (Python 3.14) and frontend/admin/ws dependencies
   - build frontend and admin
   - run backend migrations
   - install managed cron block

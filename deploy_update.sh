@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="/var/www/jotigames.nl"
+BACKEND_PYTHON_BIN="${BACKEND_PYTHON_BIN:-python3.14}"
+NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-20}"
 SERVICES_DIR_SOURCE="${ROOT_DIR}/system/services"
 CRON_INSTALL_SCRIPT="${ROOT_DIR}/system/cron/install_crontab.sh"
 NGINX_CONFIG_SOURCE="${ROOT_DIR}/system/nginx/jotigames.conf"
@@ -24,6 +26,13 @@ SYSTEMD_UNITS=(
   "jotigames-frontend.service"
   "jotigames-admin.service"
   "jotigames-socketserver.service"
+)
+
+declare -A SERVICE_PORTS=(
+  ["jotigames-backend.service"]=8000
+  ["jotigames-frontend.service"]=4173
+  ["jotigames-admin.service"]=4174
+  ["jotigames-socketserver.service"]=8081
 )
 
 log() {
@@ -49,12 +58,22 @@ require_command() {
     run_as_root apt-get update -y
     case "${command_name}" in
       git) run_as_root apt-get install -y git ;;
+      curl) run_as_root apt-get install -y curl ;;
+      python3.14)
+        if ! run_as_root apt-get install -y python3.14 python3.14-venv; then
+          log "Unable to install python3.14 from apt repositories. Install Python 3.14 manually or add a repository providing python3.14."
+          exit 1
+        fi
+        ;;
       python3) run_as_root apt-get install -y python3 ;;
       npm|node)
         run_as_root apt-get install -y nodejs npm
         ;;
       flock)
         run_as_root apt-get install -y util-linux
+        ;;
+      ss)
+        run_as_root apt-get install -y iproute2
         ;;
       nginx)
         run_as_root apt-get install -y nginx
@@ -73,6 +92,40 @@ require_command() {
     log "Required command missing: ${command_name}"
     exit 1
   fi
+}
+
+install_nodejs_20() {
+  if ! command -v apt-get >/dev/null 2>&1; then
+    log "Node.js 20 auto-install is only implemented for apt-based systems."
+    return 1
+  fi
+
+  require_command curl
+  log "Installing/upgrading Node.js 20 via NodeSource"
+  run_as_root bash -lc "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+  run_as_root apt-get install -y nodejs
+}
+
+ensure_nodejs_min_version() {
+  require_command node
+
+  local node_major
+  node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  if [[ "${node_major}" =~ ^[0-9]+$ ]] && (( node_major >= NODE_MIN_MAJOR )); then
+    require_command npm
+    return
+  fi
+
+  log "Detected Node.js major version ${node_major}, but >= ${NODE_MIN_MAJOR} is required."
+  install_nodejs_20
+
+  node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  if [[ ! "${node_major}" =~ ^[0-9]+$ ]] || (( node_major < NODE_MIN_MAJOR )); then
+    log "Node.js upgrade failed. Please install Node.js >= ${NODE_MIN_MAJOR} manually."
+    exit 1
+  fi
+
+  require_command npm
 }
 
 resolve_default_branch() {
@@ -109,9 +162,22 @@ setup_backend() {
   local backend_dir="${ROOT_DIR}/backend"
   log "Setting up backend"
 
-  require_command python3
-  if [[ ! -d "${backend_dir}/.venv" ]]; then
-    python3 -m venv "${backend_dir}/.venv"
+  require_command "${BACKEND_PYTHON_BIN}"
+
+  local venv_python="${backend_dir}/.venv/bin/python"
+  local recreate_venv="false"
+  if [[ -x "${venv_python}" ]]; then
+    local current_mm
+    current_mm="$("${venv_python}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
+    if [[ "${current_mm}" != "3.14" ]]; then
+      log "Existing backend virtualenv uses Python ${current_mm:-unknown}; recreating with Python 3.14"
+      recreate_venv="true"
+    fi
+  fi
+
+  if [[ ! -d "${backend_dir}/.venv" || "${recreate_venv}" == "true" ]]; then
+    rm -rf "${backend_dir}/.venv"
+    "${BACKEND_PYTHON_BIN}" -m venv "${backend_dir}/.venv"
   fi
 
   "${backend_dir}/.venv/bin/pip" install --upgrade pip
@@ -161,6 +227,19 @@ install_and_restart_services() {
       exit 1
     fi
 
+    run_as_root systemctl stop "${unit}" || true
+    run_as_root systemctl disable "${unit}" || true
+    run_as_root systemctl unmask "${unit}" || true
+
+    # Remove legacy/masked artifacts so the new unit is always authoritative.
+    run_as_root rm -f "/etc/systemd/system/${unit}" || true
+    run_as_root rm -f "/run/systemd/system/${unit}" || true
+    run_as_root rm -f "/lib/systemd/system/${unit}" || true
+    run_as_root rm -f "/usr/lib/systemd/system/${unit}" || true
+    run_as_root rm -rf "/etc/systemd/system/${unit}.d" || true
+    run_as_root rm -rf "/run/systemd/system/${unit}.d" || true
+    run_as_root rm -f "/etc/systemd/system/multi-user.target.wants/${unit}" || true
+
     run_as_root cp "${source_file}" "${target_file}"
   done
 
@@ -169,6 +248,48 @@ install_and_restart_services() {
   for unit in "${SYSTEMD_UNITS[@]}"; do
     run_as_root systemctl enable "${unit}"
     run_as_root systemctl restart "${unit}"
+  done
+}
+
+verify_services_healthy() {
+  log "Verifying services are active and listening on expected ports"
+
+  require_command ss
+
+  for unit in "${SYSTEMD_UNITS[@]}"; do
+    local port="${SERVICE_PORTS[${unit}]}"
+
+    # Give each service a short grace period to bind.
+    local service_ready="false"
+    for _ in {1..20}; do
+      if run_as_root systemctl is-active --quiet "${unit}"; then
+        service_ready="true"
+        break
+      fi
+      sleep 1
+    done
+
+    if [[ "${service_ready}" != "true" ]]; then
+      log "Service failed to become active: ${unit}"
+      run_as_root systemctl status "${unit}" --no-pager || true
+      exit 1
+    fi
+
+    local port_ready="false"
+    for _ in {1..20}; do
+      if run_as_root ss -ltn "sport = :${port}" | grep -q ":${port}"; then
+        port_ready="true"
+        break
+      fi
+      sleep 1
+    done
+
+    if [[ "${port_ready}" != "true" ]]; then
+      log "Service ${unit} is active but port ${port} is not listening"
+      run_as_root systemctl status "${unit}" --no-pager || true
+      run_as_root journalctl -u "${unit}" -n 100 --no-pager || true
+      exit 1
+    fi
   done
 }
 
@@ -213,8 +334,7 @@ ensure_certbot_auto_renew() {
 
 main() {
   require_command git
-  require_command npm
-  require_command node
+  ensure_nodejs_min_version
   require_command flock
   require_command nginx
   require_command certbot
@@ -231,6 +351,7 @@ main() {
   setup_ws
   install_cron
   install_and_restart_services
+  verify_services_healthy
   install_nginx_reverse_proxy
   ensure_certbot_auto_renew
 
