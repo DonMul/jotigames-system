@@ -53,6 +53,7 @@ Optional environment variables:
 
 - `SYSTEM_REPO_URL` (default: `git@github.com:DonMul/jotigames-system.git`)
 - `SYSTEM_REPO_BRANCH` (default: remote default branch)
+- `CERTBOT_EMAIL` (recommended): email used by deploy for first-time automatic Let's Encrypt certificate issuance
 
 ## Nginx + Let's Encrypt
 
@@ -69,6 +70,12 @@ Request certificates after DNS points to the server:
 
 ```bash
 bash /var/www/jotigames.nl/system/nginx/request_certificates.sh you@example.com
+```
+
+Alternatively, set `CERTBOT_EMAIL` when running deploy and it will automatically request certs if missing:
+
+```bash
+CERTBOT_EMAIL=you@example.com bash /var/www/jotigames.nl/system/deploy_update.sh
 ```
 
 The deploy script enables `certbot.timer` for automatic renewal.

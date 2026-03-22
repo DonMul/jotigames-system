@@ -6,9 +6,9 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/var/www/jotigames.nl/admin
-Environment=NODE_BIN=/root/.nvm/versions/node/v25.6.1/bin/node
-Environment=PATH=/root/.nvm/versions/node/v25.6.1/bin:/usr/local/bin:/usr/bin:/bin
-ExecStartPre=/bin/bash -lc 'NODE_BIN="${NODE_BIN:-$(command -v node)}"; test -x "$NODE_BIN"; "$NODE_BIN" --input-type=module -e "await Promise.resolve()"; "$NODE_BIN" -e "const v=Number((process.versions.node.match(/^[0-9]+/)||[0])[0]); if (!Number.isInteger(v) || v < 20) process.exit(1);"'
+Environment=NODE_BIN=/root/.nvm/versions/node/v24.14.0/bin/node
+Environment=PATH=/root/.nvm/versions/node/v24.14.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStartPre=/bin/bash -lc 'NODE_BIN="${NODE_BIN:-$(command -v node)}"; test -x "$NODE_BIN"; "$NODE_BIN" --input-type=module -e "await Promise.resolve()"; "$NODE_BIN" -e "const m=process.versions.node.match(/^([0-9]+)\.([0-9]+)/); const major=Number(m?.[1]||0); const minor=Number(m?.[2]||0); if (!Number.isInteger(major) || !Number.isInteger(minor) || major < 24 || (major === 24 && minor < 14)) process.exit(1);"'
 ExecStartPre=/bin/bash -lc 'test -d /var/www/jotigames.nl/admin/dist'
 ExecStart=/bin/bash -lc 'NODE_BIN="${NODE_BIN:-$(command -v node)}"; exec "$NODE_BIN" /var/www/jotigames.nl/admin/node_modules/vite/bin/vite.js preview --host 0.0.0.0 --port 4174'
 Restart=on-failure

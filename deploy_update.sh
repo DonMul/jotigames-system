@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
 ROOT_DIR="/var/www/jotigames.nl"
 BACKEND_PYTHON_BIN="${BACKEND_PYTHON_BIN:-python3.14}"
-NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-20}"
+NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-24}"
+NODE_MIN_MINOR="${NODE_MIN_MINOR:-14}"
 SERVICES_DIR_SOURCE="${ROOT_DIR}/system/services"
 CRON_INSTALL_SCRIPT="${ROOT_DIR}/system/cron/install_crontab.sh"
 NGINX_CONFIG_SOURCE="${ROOT_DIR}/system/nginx/jotigames.conf"
@@ -12,6 +15,7 @@ NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/jotigames.conf"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/jotigames.conf"
 LE_FULLCHAIN_PATH="/etc/letsencrypt/live/jotigames.nl/fullchain.pem"
 LE_PRIVKEY_PATH="/etc/letsencrypt/live/jotigames.nl/privkey.pem"
+CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
 
 declare -A REPOS=(
   [admin]="git@github.com:DonMul/jotigames-admin.git"
@@ -81,6 +85,9 @@ require_command() {
       certbot)
         run_as_root apt-get install -y certbot python3-certbot-nginx
         ;;
+      openssl)
+        run_as_root apt-get install -y openssl
+        ;;
       *)
         log "Unable to auto-install '${command_name}'. Please install it manually."
         exit 1
@@ -94,34 +101,38 @@ require_command() {
   fi
 }
 
-install_nodejs_20() {
+install_nodejs_24() {
   if ! command -v apt-get >/dev/null 2>&1; then
-    log "Node.js 20 auto-install is only implemented for apt-based systems."
+    log "Node.js 24 auto-install is only implemented for apt-based systems."
     return 1
   fi
 
   require_command curl
-  log "Installing/upgrading Node.js 20 via NodeSource"
-  run_as_root bash -lc "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+  log "Installing/upgrading Node.js 24 via NodeSource"
+  run_as_root bash -lc "curl -fsSL https://deb.nodesource.com/setup_24.x | bash -"
   run_as_root apt-get install -y nodejs
 }
 
 ensure_nodejs_min_version() {
   require_command node
 
-  local node_major
-  node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  if [[ "${node_major}" =~ ^[0-9]+$ ]] && (( node_major >= NODE_MIN_MAJOR )); then
+  local node_major node_minor
+  node_major="$(node -p 'Number(process.versions.node.split(".")[0]||0)' 2>/dev/null || echo 0)"
+  node_minor="$(node -p 'Number(process.versions.node.split(".")[1]||0)' 2>/dev/null || echo 0)"
+  if [[ "${node_major}" =~ ^[0-9]+$ ]] && [[ "${node_minor}" =~ ^[0-9]+$ ]] && \
+     ( (( node_major > NODE_MIN_MAJOR )) || (( node_major == NODE_MIN_MAJOR && node_minor >= NODE_MIN_MINOR )) ); then
     require_command npm
     return
   fi
 
-  log "Detected Node.js major version ${node_major}, but >= ${NODE_MIN_MAJOR} is required."
-  install_nodejs_20
+  log "Detected Node.js version ${node_major}.${node_minor}, but >= ${NODE_MIN_MAJOR}.${NODE_MIN_MINOR}.x is required."
+  install_nodejs_24
 
-  node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  if [[ ! "${node_major}" =~ ^[0-9]+$ ]] || (( node_major < NODE_MIN_MAJOR )); then
-    log "Node.js upgrade failed. Please install Node.js >= ${NODE_MIN_MAJOR} manually."
+  node_major="$(node -p 'Number(process.versions.node.split(".")[0]||0)' 2>/dev/null || echo 0)"
+  node_minor="$(node -p 'Number(process.versions.node.split(".")[1]||0)' 2>/dev/null || echo 0)"
+  if [[ ! "${node_major}" =~ ^[0-9]+$ ]] || [[ ! "${node_minor}" =~ ^[0-9]+$ ]] || \
+     ! ( (( node_major > NODE_MIN_MAJOR )) || (( node_major == NODE_MIN_MAJOR && node_minor >= NODE_MIN_MINOR )) ); then
+    log "Node.js upgrade failed. Please install Node.js >= ${NODE_MIN_MAJOR}.${NODE_MIN_MINOR}.x manually."
     exit 1
   fi
 
@@ -349,6 +360,58 @@ ensure_certbot_auto_renew() {
   run_as_root systemctl restart certbot.timer
 }
 
+certificate_covers_required_domains() {
+  if [[ ! -f "${LE_FULLCHAIN_PATH}" ]]; then
+    return 1
+  fi
+
+  local cert_text
+  cert_text="$(run_as_root openssl x509 -in "${LE_FULLCHAIN_PATH}" -noout -text 2>/dev/null || true)"
+  [[ -n "${cert_text}" ]] || return 1
+
+  grep -q "DNS:jotigames.nl" <<<"${cert_text}" || return 1
+  grep -q "DNS:www.jotigames.nl" <<<"${cert_text}" || return 1
+  grep -q "DNS:admin.jotigames.nl" <<<"${cert_text}" || return 1
+}
+
+ensure_https_certificates() {
+  require_command openssl
+
+  if [[ -f "${LE_FULLCHAIN_PATH}" && -f "${LE_PRIVKEY_PATH}" ]] && certificate_covers_required_domains; then
+    log "Let's Encrypt certs already present and cover all required domains"
+    return
+  fi
+
+  if [[ -f "${LE_FULLCHAIN_PATH}" && -f "${LE_PRIVKEY_PATH}" ]]; then
+    log "Existing certificate is present but does not include all required domains; requesting expanded certificate"
+  fi
+
+  if [[ -z "${CERTBOT_EMAIL}" ]]; then
+    log "Let's Encrypt certs are missing/incomplete and CERTBOT_EMAIL is not set; keeping current nginx config"
+    return
+  fi
+
+  log "Requesting Let's Encrypt certificate for jotigames.nl, www.jotigames.nl and admin.jotigames.nl"
+  run_as_root mkdir -p /var/www/letsencrypt
+  run_as_root certbot certonly --webroot \
+    --non-interactive \
+    --agree-tos \
+    --email "${CERTBOT_EMAIL}" \
+    --cert-name jotigames.nl \
+    --expand \
+    -w /var/www/letsencrypt \
+    -d jotigames.nl \
+    -d www.jotigames.nl \
+    -d admin.jotigames.nl
+
+  if [[ -f "${LE_FULLCHAIN_PATH}" && -f "${LE_PRIVKEY_PATH}" ]] && certificate_covers_required_domains; then
+    log "Let's Encrypt certificate obtained successfully"
+  else
+    log "Let's Encrypt certificate request completed but required domain coverage is still missing"
+    exit 1
+  fi
+}
+
 main() {
   require_command git
   ensure_nodejs_min_version
@@ -369,6 +432,8 @@ main() {
   install_cron
   install_and_restart_services
   verify_services_healthy
+  install_nginx_reverse_proxy
+  ensure_https_certificates
   install_nginx_reverse_proxy
   ensure_certbot_auto_renew
 

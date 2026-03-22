@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
 ROOT_DIR="/var/www/jotigames.nl"
 SYSTEM_REPO_URL="${SYSTEM_REPO_URL:-git@github.com:DonMul/jotigames-system.git}"
 SYSTEM_REPO_DIR="${ROOT_DIR}/system"
@@ -79,21 +81,24 @@ require_python_314() {
   fi
 }
 
-ensure_nodejs_20() {
+ensure_nodejs_24_14() {
   local current_major="0"
+  local current_minor="0"
   if command -v node >/dev/null 2>&1; then
     current_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+    current_minor="$(node -p 'process.versions.node.split(".")[1]' 2>/dev/null || echo 0)"
   fi
 
-  if [[ "${current_major}" =~ ^[0-9]+$ ]] && (( current_major >= 20 )); then
+  if [[ "${current_major}" =~ ^[0-9]+$ ]] && [[ "${current_minor}" =~ ^[0-9]+$ ]] && \
+     ( (( current_major > 24 )) || (( current_major == 24 && current_minor >= 14 )) ); then
     if ! command -v npm >/dev/null 2>&1; then
       run_as_root apt-get install -y npm
     fi
     return
   fi
 
-  log "Installing/upgrading Node.js 20 via NodeSource"
-  run_as_root bash -lc "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+  log "Installing/upgrading Node.js 24 via NodeSource"
+  run_as_root bash -lc "curl -fsSL https://deb.nodesource.com/setup_24.x | bash -"
   run_as_root apt-get install -y nodejs
 
   if ! command -v node >/dev/null 2>&1; then
@@ -118,7 +123,7 @@ bootstrap_packages() {
   require_apt_package openssh-client
   require_python_314
   require_apt_package python3-pip
-  ensure_nodejs_20
+  ensure_nodejs_24_14
   require_apt_package nginx
   require_apt_package certbot
   require_apt_package python3-certbot-nginx
