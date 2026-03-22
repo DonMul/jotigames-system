@@ -180,6 +180,14 @@ setup_backend() {
     "${BACKEND_PYTHON_BIN}" -m venv "${backend_dir}/.venv"
   fi
 
+  local effective_mm
+  effective_mm="$(${venv_python} -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
+  if [[ "${effective_mm}" != "3.14" ]]; then
+    log "Backend venv must use Python 3.14, but resolved ${effective_mm:-unknown}."
+    log "Check BACKEND_PYTHON_BIN and python3.14 installation."
+    exit 1
+  fi
+
   "${backend_dir}/.venv/bin/pip" install --upgrade pip
   "${backend_dir}/.venv/bin/pip" install -r "${backend_dir}/requirements.txt"
 

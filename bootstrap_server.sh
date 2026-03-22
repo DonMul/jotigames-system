@@ -35,9 +35,48 @@ require_python_314() {
     return
   fi
 
-  log "python3.14 is required but could not be installed from apt repositories."
-  log "Install Python 3.14 manually (or add a repository that provides python3.14), then rerun bootstrap."
-  exit 1
+  log "python3.14 not available via apt, building Python 3.14.0 from source"
+
+  run_as_root apt-get install -y \
+    build-essential \
+    zlib1g-dev \
+    libncurses5-dev \
+    libgdbm-dev \
+    libnss3-dev \
+    libssl-dev \
+    libreadline-dev \
+    libffi-dev \
+    libsqlite3-dev \
+    libbz2-dev \
+    liblzma-dev \
+    libncursesw5-dev \
+    tk-dev \
+    uuid-dev \
+    wget
+
+  local build_root="/tmp/jotigames-python-build"
+  local tarball="${build_root}/Python-3.14.0.tgz"
+  local source_dir="${build_root}/Python-3.14.0"
+
+  run_as_root rm -rf "${build_root}"
+  run_as_root mkdir -p "${build_root}"
+
+  (
+    cd "${build_root}"
+    wget https://www.python.org/ftp/python/3.14.0/Python-3.14.0.tgz
+    tar -xvf Python-3.14.0.tgz
+    cd Python-3.14.0
+    run_as_root ./configure --enable-optimizations
+    run_as_root make -j 2
+    run_as_root make altinstall
+  )
+
+  run_as_root rm -rf "${build_root}"
+
+  if ! command -v python3.14 >/dev/null 2>&1; then
+    log "Python 3.14 source install failed."
+    exit 1
+  fi
 }
 
 ensure_nodejs_20() {
@@ -74,6 +113,7 @@ bootstrap_packages() {
 
   require_apt_package ca-certificates
   require_apt_package curl
+  require_apt_package wget
   require_apt_package git
   require_apt_package openssh-client
   require_python_314

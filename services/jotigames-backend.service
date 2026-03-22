@@ -7,6 +7,7 @@ Type=simple
 User=root
 WorkingDirectory=/var/www/jotigames.nl/backend
 Environment=APP_ENV=production
+ExecStartPre=/bin/bash -lc '/var/www/jotigames.nl/backend/.venv/bin/python -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 14) else 1)"'
 ExecStart=/var/www/jotigames.nl/backend/.venv/bin/python /var/www/jotigames.nl/backend/run.py
 Restart=on-failure
 RestartSec=3
