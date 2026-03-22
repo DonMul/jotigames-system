@@ -9,6 +9,7 @@ NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-24}"
 NODE_MIN_MINOR="${NODE_MIN_MINOR:-14}"
 SERVICES_DIR_SOURCE="${ROOT_DIR}/system/services"
 CRON_INSTALL_SCRIPT="${ROOT_DIR}/system/cron/install_crontab.sh"
+CRON_RESTART_SCRIPT="${ROOT_DIR}/system/cron/restart_workers.sh"
 NGINX_CONFIG_SOURCE="${ROOT_DIR}/system/nginx/jotigames.conf"
 NGINX_HTTP_CONFIG_SOURCE="${ROOT_DIR}/system/nginx/jotigames.http.conf"
 NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/jotigames.conf"
@@ -244,6 +245,16 @@ install_cron() {
   fi
 }
 
+restart_background_workers() {
+  if [[ -x "${CRON_RESTART_SCRIPT}" ]]; then
+    log "Restarting managed background workers"
+    (cd "${ROOT_DIR}" && bash "${CRON_RESTART_SCRIPT}")
+  else
+    log "Worker restart script missing or not executable: ${CRON_RESTART_SCRIPT}"
+    exit 1
+  fi
+}
+
 install_and_restart_services() {
   log "Installing/updating systemd service units"
 
@@ -430,6 +441,7 @@ main() {
   setup_frontend_like "${ROOT_DIR}/admin"
   setup_ws
   install_cron
+  restart_background_workers
   install_and_restart_services
   verify_services_healthy
   install_nginx_reverse_proxy
