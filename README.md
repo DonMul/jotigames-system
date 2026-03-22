@@ -57,6 +57,7 @@ Optional environment variables:
 ## Nginx + Let's Encrypt
 
 - Nginx config source: `system/nginx/jotigames.conf`
+- HTTP fallback source (used before certs exist): `system/nginx/jotigames.http.conf`
 - Hosts configured:
   - `jotigames.nl` (+ `www.jotigames.nl`) -> frontend service (`127.0.0.1:4173`)
   - `admin.jotigames.nl` -> admin service (`127.0.0.1:4174`)
@@ -71,3 +72,4 @@ bash /var/www/jotigames.nl/system/nginx/request_certificates.sh you@example.com
 ```
 
 The deploy script enables `certbot.timer` for automatic renewal.
+It auto-selects HTTP-only nginx config when certs are missing and switches to HTTPS `:443` config once cert files are present.

@@ -5,8 +5,11 @@ ROOT_DIR="/var/www/jotigames.nl"
 SERVICES_DIR_SOURCE="${ROOT_DIR}/system/services"
 CRON_INSTALL_SCRIPT="${ROOT_DIR}/system/cron/install_crontab.sh"
 NGINX_CONFIG_SOURCE="${ROOT_DIR}/system/nginx/jotigames.conf"
+NGINX_HTTP_CONFIG_SOURCE="${ROOT_DIR}/system/nginx/jotigames.http.conf"
 NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/jotigames.conf"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/jotigames.conf"
+LE_FULLCHAIN_PATH="/etc/letsencrypt/live/jotigames.nl/fullchain.pem"
+LE_PRIVKEY_PATH="/etc/letsencrypt/live/jotigames.nl/privkey.pem"
 
 declare -A REPOS=(
   [admin]="git@github.com:DonMul/jotigames-admin.git"
@@ -157,6 +160,7 @@ install_and_restart_services() {
       log "Missing service unit file: ${source_file}"
       exit 1
     fi
+
     run_as_root cp "${source_file}" "${target_file}"
   done
 
@@ -171,13 +175,22 @@ install_and_restart_services() {
 install_nginx_reverse_proxy() {
   log "Installing/updating nginx reverse proxy config"
 
-  if [[ ! -f "${NGINX_CONFIG_SOURCE}" ]]; then
-    log "Missing nginx config source: ${NGINX_CONFIG_SOURCE}"
+  if [[ ! -f "${NGINX_CONFIG_SOURCE}" || ! -f "${NGINX_HTTP_CONFIG_SOURCE}" ]]; then
+    log "Missing nginx config source(s): ${NGINX_CONFIG_SOURCE} and/or ${NGINX_HTTP_CONFIG_SOURCE}"
     exit 1
   fi
 
   run_as_root mkdir -p /var/www/letsencrypt
-  run_as_root cp "${NGINX_CONFIG_SOURCE}" "${NGINX_SITE_AVAILABLE}"
+
+  local selected_nginx_source="${NGINX_HTTP_CONFIG_SOURCE}"
+  if [[ -f "${LE_FULLCHAIN_PATH}" && -f "${LE_PRIVKEY_PATH}" ]]; then
+    selected_nginx_source="${NGINX_CONFIG_SOURCE}"
+    log "Let's Encrypt certs found, enabling HTTPS nginx config"
+  else
+    log "Let's Encrypt certs not found yet, using HTTP-only nginx config"
+  fi
+
+  run_as_root cp "${selected_nginx_source}" "${NGINX_SITE_AVAILABLE}"
 
   if [[ -L "/etc/nginx/sites-enabled/default" ]]; then
     run_as_root rm -f /etc/nginx/sites-enabled/default
