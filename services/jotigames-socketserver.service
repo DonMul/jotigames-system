@@ -7,9 +7,10 @@ Type=simple
 User=root
 WorkingDirectory=/var/www/jotigames.nl/ws
 Environment=NODE_ENV=production
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStartPre=/bin/bash -lc 'node -e "const v=Number((process.versions.node.match(/^[0-9]+/)||[0])[0]); if (!Number.isInteger(v) || v < 20) process.exit(1);"'
-ExecStart=/usr/bin/env node /var/www/jotigames.nl/ws/server.js
+Environment=NODE_BIN=/root/.nvm/versions/node/v25.6.1/bin/node
+Environment=PATH=/root/.nvm/versions/node/v25.6.1/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/bin/bash -lc 'NODE_BIN="${NODE_BIN:-$(command -v node)}"; test -x "$NODE_BIN"; "$NODE_BIN" --input-type=module -e "await Promise.resolve()"; "$NODE_BIN" -e "const v=Number((process.versions.node.match(/^[0-9]+/)||[0])[0]); if (!Number.isInteger(v) || v < 20) process.exit(1);"'
+ExecStart=/bin/bash -lc 'NODE_BIN="${NODE_BIN:-$(command -v node)}"; exec "$NODE_BIN" /var/www/jotigames.nl/ws/server.js'
 Restart=on-failure
 RestartSec=3
 
