@@ -205,7 +205,11 @@ setup_backend() {
 setup_frontend_like() {
   local app_dir="$1"
   log "Installing dependencies and building ${app_dir##*/}"
-  (cd "${app_dir}" && npm ci && npm run build)
+  (
+    cd "${app_dir}" && \
+    NPM_CONFIG_PRODUCTION=false npm ci --include=dev && \
+    npm run build
+  )
 }
 
 setup_ws() {
