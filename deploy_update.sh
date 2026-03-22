@@ -210,6 +210,11 @@ setup_frontend_like() {
     NPM_CONFIG_PRODUCTION=false npm ci --include=dev && \
     npm run build
   )
+
+  if [[ ! -d "${app_dir}/dist" ]]; then
+    log "Build output missing for ${app_dir##*/}: ${app_dir}/dist does not exist"
+    exit 1
+  fi
 }
 
 setup_ws() {
