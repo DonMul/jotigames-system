@@ -41,4 +41,10 @@ start_worker \
   "${LOG_DIR}/birds_of_prey_auto_drop_eggs.lock" \
   "${LOG_DIR}/birds_of_prey_auto_drop_eggs.log"
 
+start_worker \
+  "market_crash_fluctuate_prices" \
+  "${WORKSPACE_ROOT}/backend/scripts/market_crash_fluctuate_prices.py" \
+  "${LOG_DIR}/market_crash_fluctuate_prices.lock" \
+  "${LOG_DIR}/market_crash_fluctuate_prices.log"
+
 echo "Background workers restarted without reboot."

@@ -13,6 +13,9 @@
 # Birds of Prey
 @reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/birds_of_prey_auto_drop_eggs.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/birds_of_prey_auto_drop_eggs.py >> __WORKSPACE_ROOT__/system/logs/birds_of_prey_auto_drop_eggs.log 2>&1
 
+# Market Crash
+@reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/market_crash_fluctuate_prices.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/market_crash_fluctuate_prices.py >> __WORKSPACE_ROOT__/system/logs/market_crash_fluctuate_prices.log 2>&1
+
 ###
 # System Logic
 ###

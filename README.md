@@ -2,6 +2,12 @@
 
 This folder stores operational/system setup files for background jobs.
 
+## Documentation Note
+
+Cross-system architecture and runbook context are centralized in `docs/` at repository root.
+
+Start at: `docs/README.md`
+
 ## Structure
 
 - `cron/`: crontab templates + installer scripts.
