@@ -22,7 +22,8 @@ sudo certbot certonly --webroot \
   -w /var/www/letsencrypt \
   -d jotigames.nl \
   -d www.jotigames.nl \
-  -d admin.jotigames.nl
+  -d admin.jotigames.nl \
+  -d api.jotigames.nl
 
 echo "Certificate request complete."
 echo "Now run deploy_update.sh to switch nginx from HTTP-only to HTTPS config."

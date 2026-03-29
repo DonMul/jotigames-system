@@ -29,7 +29,7 @@ NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/jotigames.conf"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/jotigames.conf"
 LE_FULLCHAIN_PATH="/etc/letsencrypt/live/jotigames.nl/fullchain.pem"
 LE_PRIVKEY_PATH="/etc/letsencrypt/live/jotigames.nl/privkey.pem"
-CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
+CERTBOT_EMAIL="${CERTBOT_EMAIL:-info@jotigames.nl}"
 
 declare -A REPOS=(
   [admin]="git@github.com:DonMul/jotigames-admin.git"
@@ -478,6 +478,7 @@ certificate_covers_required_domains() {
   grep -q "DNS:jotigames.nl" <<<"${cert_text}" || return 1
   grep -q "DNS:www.jotigames.nl" <<<"${cert_text}" || return 1
   grep -q "DNS:admin.jotigames.nl" <<<"${cert_text}" || return 1
+  grep -q "DNS:api.jotigames.nl" <<<"${cert_text}" || return 1
 }
 
 ensure_https_certificates() {
@@ -497,7 +498,7 @@ ensure_https_certificates() {
     return
   fi
 
-  log "Requesting Let's Encrypt certificate for jotigames.nl, www.jotigames.nl and admin.jotigames.nl"
+  log "Requesting Let's Encrypt certificate for jotigames.nl, www.jotigames.nl, admin.jotigames.nl and api.jotigames.nl"
   run_as_root mkdir -p /var/www/letsencrypt
   run_as_root certbot certonly --webroot \
     --non-interactive \
@@ -508,7 +509,8 @@ ensure_https_certificates() {
     -w /var/www/letsencrypt \
     -d jotigames.nl \
     -d www.jotigames.nl \
-    -d admin.jotigames.nl
+    -d admin.jotigames.nl \
+    -d api.jotigames.nl
 
   if [[ -f "${LE_FULLCHAIN_PATH}" && -f "${LE_PRIVKEY_PATH}" ]] && certificate_covers_required_domains; then
     log "Let's Encrypt certificate obtained successfully"

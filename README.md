@@ -32,7 +32,7 @@ Start at: `docs/README.md`
   - run backend migrations
   - install managed cron block
   - install/restart systemd services
-  - install/update nginx reverse proxy config for `jotigames.nl` and `admin.jotigames.nl`
+  - install/update nginx reverse proxy config for `jotigames.nl`, `admin.jotigames.nl`, and `api.jotigames.nl`
   - ensure certbot auto-renew timer is enabled
 
 Run from server:
@@ -68,9 +68,12 @@ Optional environment variables:
 - Hosts configured:
   - `jotigames.nl` (+ `www.jotigames.nl`) -> frontend service (`127.0.0.1:4173`)
   - `admin.jotigames.nl` -> admin service (`127.0.0.1:4174`)
+  - `api.jotigames.nl` -> backend service (`127.0.0.1:8000`)
 - Shared reverse-proxied paths:
   - `/api/*` -> backend (`127.0.0.1:8000`)
   - `/ws/*` -> websocket server (`127.0.0.1:8081`)
+- Backend docs access policy:
+  - `https://api.jotigames.nl/docs` and `https://api.jotigames.nl/openapi.json` are restricted to `149.143.99.118` in nginx.
 
 Request certificates after DNS points to the server:
 
