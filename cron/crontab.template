@@ -16,6 +16,9 @@
 # Market Crash
 @reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/market_crash_fluctuate_prices.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/market_crash_fluctuate_prices.py >> __WORKSPACE_ROOT__/system/logs/market_crash_fluctuate_prices.log 2>&1
 
+# Monetisation minute ticker (active games)
+* * * * * /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/tick_game_minutes.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/tick_game_minutes.py >> __WORKSPACE_ROOT__/system/logs/tick_game_minutes.log 2>&1
+
 ###
 # System Logic
 ###
