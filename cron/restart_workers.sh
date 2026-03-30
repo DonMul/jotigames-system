@@ -42,9 +42,27 @@ start_worker \
   "${LOG_DIR}/birds_of_prey_auto_drop_eggs.log"
 
 start_worker \
+  "courier_rush_spawn_points" \
+  "${WORKSPACE_ROOT}/backend/scripts/courier_rush_spawn_points.py" \
+  "${LOG_DIR}/courier_rush_spawn_points.lock" \
+  "${LOG_DIR}/courier_rush_spawn_points.log"
+
+start_worker \
   "market_crash_fluctuate_prices" \
   "${WORKSPACE_ROOT}/backend/scripts/market_crash_fluctuate_prices.py" \
   "${LOG_DIR}/market_crash_fluctuate_prices.lock" \
   "${LOG_DIR}/market_crash_fluctuate_prices.log"
+
+start_worker \
+  "pandemic_response_spawn_hotspots" \
+  "${WORKSPACE_ROOT}/backend/scripts/pandemic_response_spawn_hotspots.py" \
+  "${LOG_DIR}/pandemic_response_spawn_hotspots.lock" \
+  "${LOG_DIR}/pandemic_response_spawn_hotspots.log"
+
+start_worker \
+  "territory_control_tick_scores" \
+  "${WORKSPACE_ROOT}/backend/scripts/territory_control_tick_scores.py" \
+  "${LOG_DIR}/territory_control_tick_scores.lock" \
+  "${LOG_DIR}/territory_control_tick_scores.log"
 
 echo "Background workers restarted without reboot."

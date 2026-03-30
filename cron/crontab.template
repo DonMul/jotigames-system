@@ -13,8 +13,17 @@
 # Birds of Prey
 @reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/birds_of_prey_auto_drop_eggs.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/birds_of_prey_auto_drop_eggs.py >> __WORKSPACE_ROOT__/system/logs/birds_of_prey_auto_drop_eggs.log 2>&1
 
+# Courier Rush
+@reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/courier_rush_spawn_points.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/courier_rush_spawn_points.py >> __WORKSPACE_ROOT__/system/logs/courier_rush_spawn_points.log 2>&1
+
 # Market Crash
 @reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/market_crash_fluctuate_prices.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/market_crash_fluctuate_prices.py >> __WORKSPACE_ROOT__/system/logs/market_crash_fluctuate_prices.log 2>&1
+
+# Pandemic Response
+@reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/pandemic_response_spawn_hotspots.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/pandemic_response_spawn_hotspots.py >> __WORKSPACE_ROOT__/system/logs/pandemic_response_spawn_hotspots.log 2>&1
+
+# Territory Control
+@reboot /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/territory_control_tick_scores.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/territory_control_tick_scores.py >> __WORKSPACE_ROOT__/system/logs/territory_control_tick_scores.log 2>&1
 
 # Monetisation minute ticker (active games)
 * * * * * /usr/bin/flock -n __WORKSPACE_ROOT__/system/logs/tick_game_minutes.lock __WORKSPACE_ROOT__/backend/.venv/bin/python __WORKSPACE_ROOT__/backend/scripts/tick_game_minutes.py >> __WORKSPACE_ROOT__/system/logs/tick_game_minutes.log 2>&1
